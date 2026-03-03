@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 155 100% 50%;
+    --primary-foreground: 0 0% 4%;
+
+    --secondary: 155 50% 12%;
+    --secondary-foreground: 155 100% 50%;
+
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 55%;
+
+    --accent: 155 80% 15%;
+    --accent-foreground: 155 100% 50%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 155 100% 50%;
+
+    --radius: 0.75rem;
+
+    --chart-1: 155 100% 50%;
+    --chart-2: 155 60% 35%;
+    --chart-3: 0 70% 50%;
+    --chart-4: 45 90% 55%;
+    --chart-5: 200 80% 55%;
+
+    --glow-primary: 0 0 20px hsl(155 100% 50% / 0.3);
+    --glow-primary-strong: 0 0 40px hsl(155 100% 50% / 0.4);
+
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 155 100% 50%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 155 80% 15%;
+    --sidebar-accent-foreground: 155 100% 50%;
+    --sidebar-border: 0 0% 14%;
+    --sidebar-ring: 155 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+  .glow-primary-strong {
+    box-shadow: var(--glow-primary-strong);
+  }
+  .text-glow {
+    text-shadow: 0 0 20px hsl(155 100% 50% / 0.5);
+  }
+  .border-glow {
+    border-color: hsl(155 100% 50% / 0.3);
+  }
+  .bg-grid {
+    background-image: 
+      linear-gradient(hsl(0 0% 100% / 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(0 0% 100% / 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+}
