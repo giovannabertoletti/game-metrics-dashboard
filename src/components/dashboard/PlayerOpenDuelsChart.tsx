@@ -9,14 +9,14 @@ interface Props {
 const PlayerOpenDuelsChart = ({ data }: Props) => {
   const chartData = data.map((p) => ({
     player: p.player,
-    "Positivos": p.tatica + p.holdPositao + p.refrag,
-    "Negativos": p.troll + p.playIndividual,
+    OPK: p.tatica + p.playIndividual,
+    OPD: p.refrag + p.troll + p.holdPositao,
   }));
 
   return (
     <Card className="border-border/50 bg-card p-6">
-      <h3 className="mb-1 font-display text-lg font-bold text-foreground">Ações por Jogador</h3>
-      <p className="mb-6 text-xs text-muted-foreground">Táticas + Holds + Refrags vs Trolls + Plays Individuais</p>
+      <h3 className="mb-1 font-display text-lg font-bold text-foreground">Acoes por Jogador</h3>
+      <p className="mb-6 text-xs text-muted-foreground">OPK: Tatica + Individual | OPD: Refrag + Troll + Hold</p>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 14%)" vertical={false} />
@@ -33,8 +33,8 @@ const PlayerOpenDuelsChart = ({ data }: Props) => {
             itemStyle={{ color: "hsl(0 0% 95%)" }}
           />
           <Legend wrapperStyle={{ fontSize: 12, fontFamily: "Rajdhani" }} />
-          <Bar dataKey="Positivos" fill="hsl(155 100% 50%)" radius={[4, 4, 0, 0]} maxBarSize={32} />
-          <Bar dataKey="Negativos" fill="hsl(0 70% 50%)" radius={[4, 4, 0, 0]} maxBarSize={32} />
+          <Bar dataKey="OPK" fill="hsl(155 100% 50%)" radius={[4, 4, 0, 0]} maxBarSize={32} />
+          <Bar dataKey="OPD" fill="hsl(0 70% 50%)" radius={[4, 4, 0, 0]} maxBarSize={32} />
         </BarChart>
       </ResponsiveContainer>
     </Card>

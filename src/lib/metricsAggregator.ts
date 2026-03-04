@@ -1,8 +1,6 @@
 import type { MapWinrate, OverallStats } from "@/data/mockData";
 import type { MetricsData } from "@/hooks/useMetricsData";
 
-// ─── Firestore raw types ─────────────────────────────────────────────────────
-
 export interface FirestorePlayerStat {
   attack: number;
   defense: number;
@@ -15,20 +13,13 @@ export interface FirestorePlayer {
 
 export interface FirestoreMatch {
   isDeleted?: boolean;
-  // Date: string "YYYY-MM-DD"
   scrimDate?: string;
-  // Opponent
   opponentName?: string;
-  // Map: field is "selectedMap" in Firestore
   selectedMap?: string;
-  // Scores (rounds won per side by the team)
   attackScore?: number;
   defenseScore?: number;
-  // Players
   players?: FirestorePlayer[];
 }
-
-// ─── Exported player stats type ───────────────────────────────────────────────
 
 export interface PlayerStats {
   player: string;
@@ -37,15 +28,31 @@ export interface PlayerStats {
   refrag: number;
   playIndividual: number;
   troll: number;
+  opk: number;
+  opd: number;
+  score: number;
+}
+
+export interface PlayerOpdTypeBySide {
+  player: string;
+  troll: number;
+  refrag: number;
+  holdPosicao: number;
+}
+
+export interface PlayerOpenEventsBySide {
+  player: string;
+  opk: number;
+  opd: number;
+  opkPct: number;
+  opdPct: number;
 }
 
 export interface MapActionStats {
   map: string;
-  positivos: number; // TÁTICA + HOLD + REFRAG
-  negativos: number; // TROLL + PLAY INDIVIDUAL
+  positivos: number; // OPK: TATICA + INDIVIDUAL
+  negativos: number; // OPD: REFRAG + TROLL + HOLD
 }
-
-// ─── Filters ─────────────────────────────────────────────────────────────────
 
 export interface MetricsFilters {
   startDate?: Date;
@@ -53,7 +60,16 @@ export interface MetricsFilters {
   opponent?: string;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const FIXED_PLAYERS = ["live", "resetz", "flastry", "gabu", "stemp"] as const;
+const ALLOWED_PLAYERS = new Set(FIXED_PLAYERS);
+
+function isAllowedPlayer(name: string): boolean {
+  return ALLOWED_PLAYERS.has(name.trim().toLowerCase());
+}
+
+function toPlayerKey(name: string): string {
+  return name.trim().toLowerCase();
+}
 
 function isDeleted(match: FirestoreMatch): boolean {
   return match.isDeleted ?? false;
@@ -69,58 +85,99 @@ function getMap(match: FirestoreMatch): string {
 
 function getDate(match: FirestoreMatch): Date | null {
   if (!match.scrimDate) return null;
-  // scrimDate is "YYYY-MM-DD"
   return new Date(match.scrimDate + "T12:00:00");
 }
 
-// Win condition: in a standard R6S match (6 rounds per half = 12 total),
-// the team wins if they won more than half (> 6) of all rounds.
+function normalizeStatKey(key: string): string {
+  return key
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
 function isWin(match: FirestoreMatch): boolean {
   const won = (match.attackScore ?? 0) + (match.defenseScore ?? 0);
   return won > 6;
 }
 
-// ─── Main aggregation ─────────────────────────────────────────────────────────
-
 export function aggregateMetrics(matches: FirestoreMatch[]): MetricsData {
   const active = matches.filter((m) => !isDeleted(m));
 
   const emptyStats: OverallStats = {
-    totalMatches: 0, totalWins: 0, totalLosses: 0,
-    overallWinrate: 0, attackWinrate: 0, defenseWinrate: 0,
-    attackRoundsWon: 0, attackRoundsPlayed: 0,
-    defenseRoundsWon: 0, defenseRoundsPlayed: 0,
+    totalMatches: 0,
+    totalWins: 0,
+    totalLosses: 0,
+    overallWinrate: 0,
+    attackWinrate: 0,
+    defenseWinrate: 0,
+    attackRoundsWon: 0,
+    attackRoundsPlayed: 0,
+    defenseRoundsWon: 0,
+    defenseRoundsPlayed: 0,
   };
 
   if (active.length === 0) {
-    return { mapWinrate: [], playerStats: [], mapActionStats: [], overallStats: emptyStats };
+    return {
+      mapWinrate: [],
+      playerStats: [],
+      mapActionStats: [],
+      playerOpdTypeBySide: { attack: [], defense: [] },
+      playerOpenEventsBySide: { attack: [], defense: [] },
+      overallStats: emptyStats,
+    };
   }
 
   interface MapAcc {
-    wins: number; losses: number;
-    attackWon: number; attackPlayed: number;
-    defenseWon: number; defensePlayed: number;
-    positivos: number; negativos: number;
+    wins: number;
+    losses: number;
+    attackWon: number;
+    attackPlayed: number;
+    defenseWon: number;
+    defensePlayed: number;
+    positivos: number;
+    negativos: number;
+  }
+
+  interface SideAcc {
+    troll: number;
+    refrag: number;
+    holdPosicao: number;
+    opk: number;
+    opd: number;
   }
 
   const mapAcc: Record<string, MapAcc> = {};
   const playerAcc: Record<string, Omit<PlayerStats, "player">> = {};
+  const playerSideAcc: Record<string, { attack: SideAcc; defense: SideAcc }> = {};
+  const seenStatKeys = new Set<string>();
+  const unknownStatKeys = new Set<string>();
 
   let totalWins = 0;
-  let totalAttackWon = 0, totalAttackPlayed = 0;
-  let totalDefenseWon = 0, totalDefensePlayed = 0;
+  let totalAttackWon = 0;
+  let totalAttackPlayed = 0;
+  let totalDefenseWon = 0;
+  let totalDefensePlayed = 0;
 
   for (const match of active) {
     const map = getMap(match);
     const atkWon = match.attackScore ?? 0;
     const defWon = match.defenseScore ?? 0;
-    // In a 12-round match, rounds lost = 6 - rounds won (per side)
     const atkLost = Math.max(0, 6 - atkWon);
     const defLost = Math.max(0, 6 - defWon);
     const win = isWin(match);
 
     if (!mapAcc[map]) {
-      mapAcc[map] = { wins: 0, losses: 0, attackWon: 0, attackPlayed: 0, defenseWon: 0, defensePlayed: 0, positivos: 0, negativos: 0 };
+      mapAcc[map] = {
+        wins: 0,
+        losses: 0,
+        attackWon: 0,
+        attackPlayed: 0,
+        defenseWon: 0,
+        defensePlayed: 0,
+        positivos: 0,
+        negativos: 0,
+      };
     }
 
     mapAcc[map].wins += win ? 1 : 0;
@@ -136,32 +193,76 @@ export function aggregateMetrics(matches: FirestoreMatch[]): MetricsData {
     totalDefenseWon += defWon;
     totalDefensePlayed += defWon + defLost;
 
-    // Player stats
     for (const player of match.players ?? []) {
-      const name = player.name;
+      const name = toPlayerKey(player.name);
+      if (!isAllowedPlayer(name)) continue;
+
       if (!playerAcc[name]) {
-        playerAcc[name] = { tatica: 0, holdPositao: 0, refrag: 0, playIndividual: 0, troll: 0 };
+        playerAcc[name] = {
+          tatica: 0,
+          holdPositao: 0,
+          refrag: 0,
+          playIndividual: 0,
+          troll: 0,
+          opk: 0,
+          opd: 0,
+          score: 0,
+        };
+      }
+
+      if (!playerSideAcc[name]) {
+        playerSideAcc[name] = {
+          attack: { troll: 0, refrag: 0, holdPosicao: 0, opk: 0, opd: 0 },
+          defense: { troll: 0, refrag: 0, holdPosicao: 0, opk: 0, opd: 0 },
+        };
       }
 
       for (const [key, val] of Object.entries(player.stats ?? {})) {
-        const total = (val?.attack ?? 0) + (val?.defense ?? 0);
-        const k = key.toUpperCase();
+        const attack = val?.attack ?? 0;
+        const defense = val?.defense ?? 0;
+        const total = attack + defense;
+        const k = normalizeStatKey(key);
+        seenStatKeys.add(k);
 
-        if (k === "TÁTICA" || k === "TATICA") {
+        if (k === "TATICA") {
           playerAcc[name].tatica += total;
           mapAcc[map].positivos += total;
         } else if (k.includes("HOLD")) {
           playerAcc[name].holdPositao += total;
-          mapAcc[map].positivos += total;
+          mapAcc[map].negativos += total;
+          playerSideAcc[name].attack.holdPosicao += attack;
+          playerSideAcc[name].defense.holdPosicao += defense;
         } else if (k === "REFRAG") {
           playerAcc[name].refrag += total;
-          mapAcc[map].positivos += total;
+          mapAcc[map].negativos += total;
+          playerSideAcc[name].attack.refrag += attack;
+          playerSideAcc[name].defense.refrag += defense;
         } else if (k.includes("INDIVIDUAL")) {
           playerAcc[name].playIndividual += total;
-          mapAcc[map].negativos += total;
+          mapAcc[map].positivos += total;
         } else if (k === "TROLL") {
           playerAcc[name].troll += total;
           mapAcc[map].negativos += total;
+          playerSideAcc[name].attack.troll += attack;
+          playerSideAcc[name].defense.troll += defense;
+        } else if (
+          k === "OPK" ||
+          k.includes("OPEN KILL") ||
+          k.includes("OPENING KILL") ||
+          k.includes("ENTRY KILL")
+        ) {
+          playerSideAcc[name].attack.opk += attack;
+          playerSideAcc[name].defense.opk += defense;
+        } else if (
+          k === "OPD" ||
+          k.includes("OPEN DEATH") ||
+          k.includes("OPENING DEATH") ||
+          k.includes("ENTRY DEATH")
+        ) {
+          playerSideAcc[name].attack.opd += attack;
+          playerSideAcc[name].defense.opd += defense;
+        } else {
+          unknownStatKeys.add(k);
         }
       }
     }
@@ -173,36 +274,116 @@ export function aggregateMetrics(matches: FirestoreMatch[]): MetricsData {
   const attackWinrate = totalAttackPlayed > 0 ? +((totalAttackWon / totalAttackPlayed) * 100).toFixed(1) : 0;
   const defenseWinrate = totalDefensePlayed > 0 ? +((totalDefenseWon / totalDefensePlayed) * 100).toFixed(1) : 0;
 
-  const mapWinrate: MapWinrate[] = Object.entries(mapAcc).map(([map, s]) => ({
-    map,
-    wins: s.wins,
-    losses: s.losses,
-    winrate: s.wins + s.losses > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) : 0,
-    attackWinrate: s.attackPlayed > 0 ? Math.round((s.attackWon / s.attackPlayed) * 100) : 0,
-    defenseWinrate: s.defensePlayed > 0 ? Math.round((s.defenseWon / s.defensePlayed) * 100) : 0,
-  })).filter(m => m.map !== "Desconhecido").sort((a, b) => b.winrate - a.winrate);
+  const mapWinrate: MapWinrate[] = Object.entries(mapAcc)
+    .map(([map, s]) => ({
+      map,
+      wins: s.wins,
+      losses: s.losses,
+      winrate: s.wins + s.losses > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) : 0,
+      attackWinrate: s.attackPlayed > 0 ? Math.round((s.attackWon / s.attackPlayed) * 100) : 0,
+      defenseWinrate: s.defensePlayed > 0 ? Math.round((s.defenseWon / s.defensePlayed) * 100) : 0,
+    }))
+    .filter((m) => m.map !== "Desconhecido")
+    .sort((a, b) => b.winrate - a.winrate);
 
-  const playerStats: PlayerStats[] = Object.entries(playerAcc)
-    .map(([player, s]) => ({ player, ...s }))
-    .sort((a, b) => (b.tatica + b.holdPositao + b.refrag) - (a.tatica + a.holdPositao + a.refrag));
+  const playerStats: PlayerStats[] = FIXED_PLAYERS.map((player) => {
+    const tatica = playerAcc[player]?.tatica ?? 0;
+    const holdPositao = playerAcc[player]?.holdPositao ?? 0;
+    const refrag = playerAcc[player]?.refrag ?? 0;
+    const playIndividual = playerAcc[player]?.playIndividual ?? 0;
+    const troll = playerAcc[player]?.troll ?? 0;
+    const opk = tatica + playIndividual;
+    const opd = refrag + troll + holdPositao;
+
+    return {
+      player,
+      tatica,
+      holdPositao,
+      refrag,
+      playIndividual,
+      troll,
+      opk,
+      opd,
+      score: opk - opd,
+    };
+  });
 
   const mapActionStats: MapActionStats[] = Object.entries(mapAcc)
     .filter(([map]) => map !== "Desconhecido")
     .map(([map, s]) => ({ map, positivos: s.positivos, negativos: s.negativos }));
 
+  const toOpenEvents = (player: string, side: SideAcc): PlayerOpenEventsBySide => {
+    const total = side.opk + side.opd;
+    return {
+      player,
+      opk: side.opk,
+      opd: side.opd,
+      opkPct: total > 0 ? +((side.opk / total) * 100).toFixed(1) : 0,
+      opdPct: total > 0 ? +((side.opd / total) * 100).toFixed(1) : 0,
+    };
+  };
+
+  const playerOpdTypeBySide = {
+    attack: FIXED_PLAYERS.map((player) => {
+      const s = playerSideAcc[player];
+      return {
+        player,
+        troll: s?.attack.troll ?? 0,
+        refrag: s?.attack.refrag ?? 0,
+        holdPosicao: s?.attack.holdPosicao ?? 0,
+      };
+    }),
+    defense: FIXED_PLAYERS.map((player) => {
+      const s = playerSideAcc[player];
+      return {
+        player,
+        troll: s?.defense.troll ?? 0,
+        refrag: s?.defense.refrag ?? 0,
+        holdPosicao: s?.defense.holdPosicao ?? 0,
+      };
+    }),
+  };
+
+  const playerOpenEventsBySide = {
+    attack: FIXED_PLAYERS.map((player) => {
+      const s = playerSideAcc[player];
+      return toOpenEvents(player, s?.attack ?? { troll: 0, refrag: 0, holdPosicao: 0, opk: 0, opd: 0 });
+    }),
+    defense: FIXED_PLAYERS.map((player) => {
+      const s = playerSideAcc[player];
+      return toOpenEvents(player, s?.defense ?? { troll: 0, refrag: 0, holdPosicao: 0, opk: 0, opd: 0 });
+    }),
+  };
+
   const overallStats: OverallStats = {
-    totalMatches, totalWins, totalLosses, overallWinrate,
-    attackWinrate, defenseWinrate,
+    totalMatches,
+    totalWins,
+    totalLosses,
+    overallWinrate,
+    attackWinrate,
+    defenseWinrate,
     attackRoundsWon: totalAttackWon,
     attackRoundsPlayed: totalAttackPlayed,
     defenseRoundsWon: totalDefenseWon,
     defenseRoundsPlayed: totalDefensePlayed,
   };
 
-  return { mapWinrate, playerStats, mapActionStats, overallStats };
-}
+  if (import.meta.env.DEV) {
+    console.log("[Metrics] Chaves de stats detectadas:", Array.from(seenStatKeys).sort());
+    if (unknownStatKeys.size > 0) {
+      console.warn("[Metrics] Chaves nao mapeadas:", Array.from(unknownStatKeys).sort());
+    }
+  }
 
-// ─── Client-side filtering ────────────────────────────────────────────────────
+  return {
+    mapWinrate,
+    playerStats,
+    mapActionStats,
+    playerOpdTypeBySide,
+    playerOpenEventsBySide,
+    overallStats,
+  };
+}
 
 export function filterMatches(matches: FirestoreMatch[], filters: MetricsFilters): FirestoreMatch[] {
   return matches.filter((match) => {
@@ -224,8 +405,6 @@ export function filterMatches(matches: FirestoreMatch[], filters: MetricsFilters
 }
 
 export function extractOpponents(matches: FirestoreMatch[]): string[] {
-  const set = new Set(
-    matches.filter((m) => !isDeleted(m)).map(getOpponent)
-  );
+  const set = new Set(matches.filter((m) => !isDeleted(m)).map(getOpponent));
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }

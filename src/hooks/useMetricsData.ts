@@ -11,18 +11,28 @@ import {
   type MetricsFilters,
   type PlayerStats,
   type MapActionStats,
+  type PlayerOpdTypeBySide,
+  type PlayerOpenEventsBySide,
 } from "@/lib/metricsAggregator";
 
 export interface MetricsData {
   mapWinrate: MapWinrate[];
   playerStats: PlayerStats[];
   mapActionStats: MapActionStats[];
+  playerOpdTypeBySide: {
+    attack: PlayerOpdTypeBySide[];
+    defense: PlayerOpdTypeBySide[];
+  };
+  playerOpenEventsBySide: {
+    attack: PlayerOpenEventsBySide[];
+    defense: PlayerOpenEventsBySide[];
+  };
   overallStats: OverallStats;
 }
 
 async function fetchRawMatches(): Promise<FirestoreMatch[]> {
   if (!isFirebaseConfigured || !db) {
-    console.warn("[Firebase] Não configurado.");
+    console.warn("[Firebase] Nao configurado.");
     return [];
   }
   try {
@@ -37,7 +47,11 @@ async function fetchRawMatches(): Promise<FirestoreMatch[]> {
 }
 
 export function useMetricsData(filters: MetricsFilters = {}) {
-  const { data: rawMatches = [], isLoading, isError } = useQuery<FirestoreMatch[]>({
+  const {
+    data: rawMatches = [],
+    isLoading,
+    isError,
+  } = useQuery<FirestoreMatch[]>({
     queryKey: ["partidas_r6s"],
     queryFn: fetchRawMatches,
     staleTime: 1000 * 60 * 5,
@@ -47,8 +61,27 @@ export function useMetricsData(filters: MetricsFilters = {}) {
 
   const metrics = useMemo<MetricsData>(() => {
     if (isError || rawMatches.length === 0) {
-      return { mapWinrate: [], playerStats: [], mapActionStats: [], overallStats: { totalMatches: 0, totalWins: 0, totalLosses: 0, overallWinrate: 0, attackWinrate: 0, defenseWinrate: 0, attackRoundsWon: 0, attackRoundsPlayed: 0, defenseRoundsWon: 0, defenseRoundsPlayed: 0 } };
+      return {
+        mapWinrate: [],
+        playerStats: [],
+        mapActionStats: [],
+        playerOpdTypeBySide: { attack: [], defense: [] },
+        playerOpenEventsBySide: { attack: [], defense: [] },
+        overallStats: {
+          totalMatches: 0,
+          totalWins: 0,
+          totalLosses: 0,
+          overallWinrate: 0,
+          attackWinrate: 0,
+          defenseWinrate: 0,
+          attackRoundsWon: 0,
+          attackRoundsPlayed: 0,
+          defenseRoundsWon: 0,
+          defenseRoundsPlayed: 0,
+        },
+      };
     }
+
     const filtered = filterMatches(rawMatches, filters);
     return aggregateMetrics(filtered);
   }, [rawMatches, filters, isError]);
