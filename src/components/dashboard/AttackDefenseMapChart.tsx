@@ -1,26 +1,33 @@
 import { Card } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { mapWinrateData } from "@/data/mockData";
+import type { MapWinrate } from "@/data/mockData";
+import { TruncatedTick, getMaxChars } from "./ChartTick";
 
-const data = mapWinrateData.map((m) => ({
-  map: m.map,
-  Ataque: m.attackWinrate,
-  Defesa: m.defenseWinrate,
-}));
+interface Props {
+  data: MapWinrate[];
+}
 
-const AttackDefenseMapChart = () => {
+const AttackDefenseMapChart = ({ data }: Props) => {
+  const maxChars = getMaxChars(data.length);
+  const chartData = data.map((m) => ({
+    map: m.map,
+    Ataque: m.attackWinrate,
+    Defesa: m.defenseWinrate,
+  }));
+
   return (
     <Card className="border-border/50 bg-card p-6">
       <h3 className="mb-1 font-display text-lg font-bold text-foreground">Ataque vs Defesa por Mapa</h3>
       <p className="mb-6 text-xs text-muted-foreground">Winrate de rounds por lado em cada mapa</p>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+        <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 14%)" vertical={false} />
           <XAxis
             dataKey="map"
-            tick={{ fill: "hsl(0 0% 55%)", fontSize: 12, fontFamily: "Rajdhani" }}
+            tick={(props: object) => <TruncatedTick {...props} maxChars={maxChars} />}
             axisLine={{ stroke: "hsl(0 0% 14%)" }}
             tickLine={false}
+            interval={0}
           />
           <YAxis
             domain={[0, 100]}
@@ -30,13 +37,9 @@ const AttackDefenseMapChart = () => {
             tickFormatter={(v) => `${v}%`}
           />
           <Tooltip
-            contentStyle={{
-              background: "hsl(0 0% 7%)",
-              border: "1px solid hsl(0 0% 14%)",
-              borderRadius: "8px",
-              color: "hsl(0 0% 95%)",
-              fontSize: 13,
-            }}
+            contentStyle={{ background: "hsl(0 0% 7%)", border: "1px solid hsl(0 0% 14%)", borderRadius: "8px", fontSize: 13 }}
+            labelStyle={{ color: "hsl(0 0% 75%)" }}
+            itemStyle={{ color: "hsl(0 0% 95%)" }}
             formatter={(value: number) => `${value}%`}
           />
           <Legend

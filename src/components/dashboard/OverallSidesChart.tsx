@@ -1,8 +1,12 @@
 import { Card } from "@/components/ui/card";
-import { overallStats } from "@/data/mockData";
+import type { OverallStats } from "@/data/mockData";
 
-const OverallSidesChart = () => {
-  const { attackWinrate, defenseWinrate, attackRoundsWon, attackRoundsPlayed, defenseRoundsWon, defenseRoundsPlayed } = overallStats;
+interface Props {
+  data: OverallStats;
+}
+
+const OverallSidesChart = ({ data }: Props) => {
+  const { attackWinrate, defenseWinrate, attackRoundsWon, attackRoundsPlayed, defenseRoundsWon, defenseRoundsPlayed } = data;
 
   return (
     <Card className="border-border/50 bg-card p-6">
