@@ -11,6 +11,7 @@ import FilterBar from "@/components/dashboard/FilterBar";
 import PlayerOpdTypeBySideCharts from "@/components/dashboard/PlayerOpdTypeBySideCharts";
 import { useMetricsData } from "@/hooks/useMetricsData";
 import type { MetricsFilters } from "@/lib/metricsAggregator";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   const [filters, setFilters] = useState<MetricsFilters>({});
@@ -30,12 +31,17 @@ const Index = () => {
     <div className="min-h-screen bg-background bg-grid">
       <header className="border-b border-border/50 px-6 py-5">
         <div className="mx-auto max-w-7xl">
-          <div className="flex items-center gap-3">
-            <Crosshair className="h-7 w-7 text-primary" />
-            <div>
-              <h1 className="text-glow font-display text-2xl font-bold text-foreground">TEAM DASHBOARD</h1>
-              <p className="text-xs text-muted-foreground">Metricas de performance competitiva</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Crosshair className="h-7 w-7 text-primary" />
+              <div>
+                <h1 className="text-glow font-display text-2xl font-bold text-foreground">TEAM DASHBOARD</h1>
+                <p className="text-xs text-muted-foreground">Metricas de performance competitiva</p>
+              </div>
             </div>
+            <Link to="/readme" className="text-xs text-primary underline underline-offset-4">
+              Ver README
+            </Link>
           </div>
         </div>
       </header>

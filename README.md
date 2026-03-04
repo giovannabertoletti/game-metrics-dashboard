@@ -1,102 +1,102 @@
-# Game Metrics Dashboard
+# Dashboard de Metricas de Jogo
 
-## Data Source
-- Raw data comes from Firebase collection `partidas_r6s` in `useMetricsData`.
-- Metric calculations are done on frontend in `aggregateMetrics` (`src/lib/metricsAggregator.ts`).
+## Fonte de dados
+- Os dados brutos vem do Firebase, na colecao `partidas_r6s`, via `useMetricsData`.
+- Todos os calculos de metricas sao feitos no frontend em `aggregateMetrics` (`src/lib/metricsAggregator.ts`).
 
-## Filters
-Dashboard filters are applied before aggregation:
-- Start date
-- End date
-- Opponent
+## Filtros
+A dashboard aplica os filtros antes da agregacao:
+- Data inicio
+- Data fim
+- Time inimigo
 
-Rules:
-- Matches with `isDeleted = true` are ignored.
-- Date filter uses `scrimDate`.
+Regras:
+- Partidas com `isDeleted = true` sao ignoradas.
+- O filtro de data usa o campo `scrimDate`.
 
-## Player Scope
-Player metrics include only:
+## Escopo de jogadores
+As metricas de jogador consideram apenas:
 - `live`
 - `resetz`
 - `flastry`
 - `gabu`
 - `stemp`
 
-Order is fixed in this exact sequence across player charts and table.
+A ordem e fixa nessa sequencia em tabela e graficos de jogador.
 
-## Base Calculation Rules
+## Regras base de calculo
 
-### Match Win
-- `roundsWon = attackScore + defenseScore`
-- `win = roundsWon > 6`
+### Vitoria de partida
+- `roundsVencidos = attackScore + defenseScore`
+- `vitoria = roundsVencidos > 6`
 
-### Rounds Played by Side
-Per match:
+### Rounds jogados por lado
+Por partida:
 - `attackRoundsPlayed += attackWon + max(0, 6 - attackWon)`
 - `defenseRoundsPlayed += defenseWon + max(0, 6 - defenseWon)`
 
-## Top Stat Cards
+## Cards do topo
 
-### Matches
-- `totalMatches = number of active matches after filters`
+### Partidas
+- `totalMatches = numero de partidas ativas apos filtros`
 
-### Wins
-- `totalWins = matches where (attackScore + defenseScore) > 6`
+### Vitorias
+- `totalWins = partidas onde (attackScore + defenseScore) > 6`
 
-### Losses
+### Derrotas
 - `totalLosses = totalMatches - totalWins`
 
 ### Winrate
 - `overallWinrate = (totalWins / totalMatches) * 100`
 
-### Attack WR
+### WR Ataque
 - `attackWinrate = (attackRoundsWon / attackRoundsPlayed) * 100`
 
-### Defense WR
+### WR Defesa
 - `defenseWinrate = (defenseRoundsWon / defenseRoundsPlayed) * 100`
 
-## Charts
+## Graficos
 
-### 1) Winrate by Map (`MapWinrateChart`)
-Per map:
-- `wins = won matches on map`
-- `losses = lost matches on map`
+### 1) Winrate por mapa (`MapWinrateChart`)
+Para cada mapa:
+- `wins = partidas vencidas no mapa`
+- `losses = partidas perdidas no mapa`
 - `winrate = wins / (wins + losses) * 100`
-- `attackWinrate = attackWonOnMap / attackPlayedOnMap * 100`
-- `defenseWinrate = defenseWonOnMap / defensePlayedOnMap * 100`
+- `attackWinrate = attackWonNoMapa / attackPlayedNoMapa * 100`
+- `defenseWinrate = defenseWonNoMapa / defensePlayedNoMapa * 100`
 
-Notes:
-- `Desconhecido` map is removed.
-- Sorted by `winrate` desc.
+Observacoes:
+- O mapa `Desconhecido` e removido.
+- Ordenacao por `winrate` decrescente.
 
-### 2) Attack vs Defense by Map (`AttackDefenseMapChart`)
-Uses map winrate dataset:
-- `Ataque` bar = map `attackWinrate`
-- `Defesa` bar = map `defenseWinrate`
+### 2) Ataque vs defesa por mapa (`AttackDefenseMapChart`)
+Usa os mesmos dados do grafico de winrate por mapa:
+- barra `Ataque` = `attackWinrate` do mapa
+- barra `Defesa` = `defenseWinrate` do mapa
 
-### 3) Overall Side Winrate (`OverallSidesChart`)
-Shows:
-- `attackWinrate` and `attackRoundsWon/attackRoundsPlayed`
-- `defenseWinrate` and `defenseRoundsWon/defenseRoundsPlayed`
+### 3) Winrate geral por lado (`OverallSidesChart`)
+Mostra:
+- `attackWinrate` e `attackRoundsWon/attackRoundsPlayed`
+- `defenseWinrate` e `defenseRoundsWon/defenseRoundsPlayed`
 
-### 4) Player Actions (OPK x OPD) (`PlayerOpenDuelsChart`)
-Requested rule:
-- `OPK (green) = Tatica + Play Individual`
-- `OPD (red) = Refrag + Troll + Hold`
+### 4) Acoes por jogador (OPK x OPD) (`PlayerOpenDuelsChart`)
+Regra solicitada (verde/vermelho):
+- `OPK (verde) = Tatica + Play Individual`
+- `OPD (vermelho) = Refrag + Troll + Hold`
 
-### 5) Map Actions (OPK x OPD) (`OpenDuelsByMapChart`)
-Collective totals by map with same rule:
+### 5) Acoes por mapa (OPK x OPD) (`OpenDuelsByMapChart`)
+Acumulado coletivo por mapa com a mesma regra:
 - `OPK (positivos) = Tatica + Play Individual`
 - `OPD (negativos) = Refrag + Troll + Hold`
 
-### 6) OPD Type x Players (Attack/Defense) (`PlayerOpdTypeBySideCharts`)
-Split by side using each stat `attack` and `defense` values:
-- Series: `troll`, `refrag`, `holdPosicao`
-- `[ATAQUE]` panel uses only attack values
-- `[DEFESA]` panel uses only defense values
+### 6) OPD Type x Players (Ataque/Defesa) (`PlayerOpdTypeBySideCharts`)
+Separa por lado usando os campos `attack` e `defense` de cada stat:
+- series: `troll`, `refrag`, `holdPosicao`
+- painel `[ATAQUE]` usa somente valores de ataque
+- painel `[DEFESA]` usa somente valores de defesa
 
-## Player Action Table (`PlayerStatsTable`)
-Columns:
+## Tabela de acoes (`PlayerStatsTable`)
+Colunas:
 - `Tatica`
 - `Play Ind.`
 - `Refrag`
@@ -105,30 +105,30 @@ Columns:
 - `Score`
 
 ### Score
-Requested metric:
+Metrica solicitada:
 - `OPK = Tatica + Play Individual`
 - `OPD = Refrag + Troll + Hold`
 - `Score = OPK - OPD`
 
-Example:
+Exemplo:
 - `50 OPK - 30 OPD = +20`
 
-## Firebase Key Mapping
-Normalization for `player.stats` keys:
-- remove accents
-- uppercase
+## Mapeamento de chaves do Firebase
+Normalizacao aplicada nas chaves de `player.stats`:
+- remove acentos
+- converte para uppercase
 
-Mapped keys:
+Mapeamentos usados:
 - `TATICA` -> tatica
-- contains `HOLD` -> hold
+- contem `HOLD` -> hold
 - `REFRAG` -> refrag
-- contains `INDIVIDUAL` -> play individual
+- contem `INDIVIDUAL` -> play individual
 - `TROLL` -> troll
-- `OPK` or contains `OPEN KILL`/`OPENING KILL`/`ENTRY KILL`
-- `OPD` or contains `OPEN DEATH`/`OPENING DEATH`/`ENTRY DEATH`
+- `OPK` ou contem `OPEN KILL`/`OPENING KILL`/`ENTRY KILL`
+- `OPD` ou contem `OPEN DEATH`/`OPENING DEATH`/`ENTRY DEATH`
 
-In development console:
-- detected keys
-- unmapped keys
+Em desenvolvimento, o console mostra:
+- chaves detectadas
+- chaves nao mapeadas
 
-This helps adjust parsing if Firebase keys differ.
+Isso ajuda a ajustar parsing caso o Firebase use nomes diferentes.
